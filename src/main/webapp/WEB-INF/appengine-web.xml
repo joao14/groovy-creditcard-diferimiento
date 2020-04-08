@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<appengine-web-app xmlns="http://appengine.google.com/ns/1.0">
+  <application>marketingdigital</application>
+  <version>1</version>
+  <!--Desarrollo-->
+  <!--<service>md-diferimiento-dev</service>-->
+  <!--Producción -->
+  <service>md-diferimiento</service>
+  <threadsafe>true</threadsafe>
+  <runtime>java8</runtime>
+</appengine-web-app>
