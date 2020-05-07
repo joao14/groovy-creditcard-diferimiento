@@ -1,6 +1,9 @@
 package banco.pichincha.diferimiento.configuration;
 
 import banco.pichincha.diferimiento.exception.ApiRequestException;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.jdbc.DataSourceBuilder;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.filter.OncePerRequestFilter;
 import io.jsonwebtoken.Claims;
@@ -12,6 +15,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import javax.servlet.FilterChain;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.sql.DataSource;
 import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -75,5 +79,6 @@ public class JWTAuthorizationFilter extends OncePerRequestFilter {
         String authenticationHeader = request.getHeader(HEADER);
         return authenticationHeader != null && authenticationHeader.startsWith(PREFIX);
     }
+
 
 }

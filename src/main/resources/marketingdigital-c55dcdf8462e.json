@@ -1,0 +1,12 @@
+{
+  "type": "service_account",
+  "project_id": "marketingdigital",
+  "private_key_id": "c55dcdf8462e8936db07109e7f77b8f11ad9da92",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCmEY10THqY99O2\nBLX+OBmZuBa3xFvyfFbbX5EUgpVW/n0JIsZvkQhxTtEgF1M18Tr82hSjIote4f8J\nSg4QpBM67WI77i6ckUB6GxnekjCoLKPxwmAe4T/nfxOz8co4Ac9EevodHLjEZwg0\nkxorBjapX1I108E0Lgx89y7mehP06bCXRxJQ2RxztRvD6szB2IRDAMH/08atGeWN\njEe8qsYN/31iKKS4YSi1hiSAY/YmBFFnmgGFutzghTDcPhic2RSCXiorsg5FDzUV\n5zxPgs5/hQEYeVUFNRK2d/XtGPCf5wQYgu3MuVPVreeimYOy2YIdjTbGjA/Dij60\nXVzC/YHHAgMBAAECggEANl0cn2vB3n2Sks1r/nLC/q1i0nm3V+QYUuwwBDTTSo04\nxVra9v7VcrJIh2bbWJdFpiyGAPl4AnGdGZ9ih1QO74VyWQgZvitWniJtD41v3D3w\n1V26NaGrV88j1g5bEoaVIWfYpNsYKUNJTlyxflAkaMHJmdFeOASzFd2dPtnL2qp2\njKzJTGTgqrWAwl23eOYMBQmD0hSlcIBt47fZv3VZo4jOWb+kZul6gffKB9eqcGT7\nML8VYX9oDdddS3xFwFbz4LgaVRb+0VDdkMTxHC4Vz3Qsw0jtW8vsiOXC+pnRd6x2\nw24OSntmiXg1ThchrqInBjcJzJHQX/TsHWPUVyWiMQKBgQDV1uPJd5AOcKNp7QYY\nmk2wo01APtD+Ncb14M1HpUNBQhObZkmknP46euT99iRzy8Rvv8ywKgYbRz8ejbeT\nvfO976/rqPGzwFWX9YSNTX/SqyxhPWg3DLcthpiFFTqZyPoQmZGoBNNSAKHnafzt\njVXRjO9TMgYYryGvkbgErVdvewKBgQDGz4azWCA1g3X7WGEXEU5LRSOXMIbJQ4nY\nTyaOmQCNTkpp1z0G2qp8HPY0mdXnNJLXWVq9iAmyei8+NU4oslr3WwD4vTRvIlVY\nqYH+91RpR6mAGQxJ5cQsfGFpP/VL6lo/aWgNVWvzBoi1znRywe18xgCF3e/Lk5fu\nKX7stEefJQKBgQChMIeqIPc0+1EjEqkKuJ2hbadYq0EsrmrYgukafYex1FYlSLhw\nXmsAuAyPJxCZPNtJBUIM9NB/lXgN1vOvaXsnDFsGf+YaAfxDPK37OZUFv0QH1JsP\nDAW0SoYDo1n1/FoLU0dJaMHGSXXBk9I1Wtl6yQrKIqYXy0PQLT6SP/vtqwKBgHLc\nHL9qr5kbLUOcSOOR3QEBndFQeN64hWASQn1qCfaZf8ZsUtat6IcyGFBFfF5Kcne2\nKQWNHcUecELpexFqEcIMsqACd9OpK1PBAtiyPfNhMp1OW1oqQ89LwN+U0vwcFi3C\nkRn6+xX59WvMLlzKi5Flt5GfqlWcHM+865aHhUV9AoGAIJfewusrU3dJSwLR/2pL\nNNDJzqZ/ffurle9rbcV46f4poiEsy3YBjrfT3J0qD7fknAHBgzywDUHbq5OPlXAG\nM/3JFMKjxvivd9fpDH77WNNZje5uM7R5yWi1jV+g5Y31mbXUe2KEd5KQkjeaoGuX\nai8Y+Lw61VDqZSlaolAu5DM=\n-----END PRIVATE KEY-----\n",
+  "client_email": "marketing-digital-diferimiento@marketingdigital.iam.gserviceaccount.com",
+  "client_id": "106773013210287029456",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/marketing-digital-diferimiento%40marketingdigital.iam.gserviceaccount.com"
+}

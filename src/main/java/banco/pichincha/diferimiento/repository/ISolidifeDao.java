@@ -9,12 +9,16 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import javax.transaction.Transactional;
+import java.util.List;
 
 @Repository
 public interface ISolidifeDao extends JpaRepository<DifSolidife,Integer> {
 
     @Query(value = "SELECT * FROM dif_solidife d WHERE d.clie_id=:clieId", nativeQuery = true)
     public abstract DifSolidife findSoliDifeByClient(@Param("clieId") Integer clieId);
+
+    @Query(value = "SELECT * FROM dif_solidife d WHERE d.clie_id=:clieId", nativeQuery = true)
+    public abstract DifSolidife findSoliDifeByClientTarjetas(@Param("clieId") Integer clieId);
 
     @Modifying
     @Transactional

@@ -51,7 +51,6 @@ public class OtpController {
                 apiResponse = new ApiResponse(response.getBody().getMessage(), String.valueOf(HttpStatus.OK.value()),
                         HttpStatus.OK, new Date(), "", null);
             }else{
-                System.out.println("Algo surgio mal");
                 apiResponse = new ApiResponse(response.getBody().getMessage(), String.valueOf(HttpStatus.BAD_REQUEST.value()),
                         HttpStatus.BAD_REQUEST, new Date(), "", null);
             }

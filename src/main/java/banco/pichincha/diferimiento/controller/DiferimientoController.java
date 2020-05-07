@@ -5,10 +5,12 @@ import banco.pichincha.diferimiento.exception.ApiRequestException;
 import banco.pichincha.diferimiento.model.RequestCliente;
 import banco.pichincha.diferimiento.model.RequestSolicitudOtp;
 import banco.pichincha.diferimiento.services.DiferimientoServices;
+import banco.pichincha.diferimiento.services.EncryptService;
 import banco.pichincha.diferimiento.services.OtpServices;
 import banco.pichincha.diferimiento.services.RecaptchaService;
 import banco.pichincha.diferimiento.util.ApiResponse;
 import banco.pichincha.diferimiento.util.UtilResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +31,8 @@ public class DiferimientoController {
     private static final String LOGGER_REQUEST_FORMAT = "001-REQ";
     private static final Logger logger = LoggerFactory.getLogger(DiferimientoController.class);
 
+    ObjectMapper mapper = new ObjectMapper();
+
     @Autowired
     private DiferimientoServices diferimientoServices;
 
@@ -38,28 +42,40 @@ public class DiferimientoController {
     @Autowired
     private OtpServices otpServices;
 
+    @Autowired
+    private EncryptService encryptService;
+
+
     @PostMapping(value = "/create")
     public ResponseEntity<Object> createDiferimiento(@RequestBody RequestCliente requestCliente, HttpServletRequest request, HttpServletResponse respo) {
-        logger.info("Iniciando el diferimiento del cliente : " + requestCliente.getIdentificacion()
-                + " desde la siguiente IP : " + request.getRemoteAddr(), LOGGER_REQUEST_FORMAT);
+        logger.info("Iniciando el diferimiento del cliente para créditos o tarjetas desde la siguiente IP : " + request.getRemoteAddr(), LOGGER_REQUEST_FORMAT);
         ApiResponse apiResponse = new ApiResponse();
         try {
-             if (!recaptchaService.valid(request, respo)) {
+            if (!recaptchaService.valid(request, respo)) {
                 throw new ApiRequestException("La Captcha no ha podido ser validado :(");
             }
+            String cliente_request = mapper.writeValueAsString(requestCliente);
+            logger.info("JSON  [] => " + cliente_request, LOGGER_REQUEST_FORMAT);
+            logger.info("1.- Desencriptando la información del request ", LOGGER_REQUEST_FORMAT);
+            requestCliente = encryptService.getObject(requestCliente);
             //Validamos la cédula con digitos para completar si es de longitud 14
             requestCliente.setIdentificacion(UtilResponse.validateRequestIdentificacion(requestCliente.getIdentificacion()));
-            //seguimos con el proceso normal
-            ResponseEntity<ApiResponse> resp=diferimientoServices.createDiferimiento(requestCliente,request);
-            apiResponse = new ApiResponse(resp.getBody().getMessage(), String.valueOf(HttpStatus.OK.value()),
-                    HttpStatus.OK, new Date(), resp.getBody().getType() ,resp.getBody().getData());
-        }
-        catch (ApiRequestException e) {
+            //Imprimiendo el nuevo objeto
+            String cliente = mapper.writeValueAsString(requestCliente);
+            logger.info("JSON DESENCRIPTADO [] => " + cliente, LOGGER_REQUEST_FORMAT);
+            logger.info("2.- Empezando el proceso de diferimiento ", LOGGER_REQUEST_FORMAT);
+            ResponseEntity<ApiResponse> resp = diferimientoServices.createDiferimiento(requestCliente, request);
+            if (resp.getStatusCodeValue() == 200) {
+                apiResponse = new ApiResponse(resp.getBody().getMessage(), String.valueOf(resp.getStatusCodeValue()),
+                        resp.getStatusCode(), new Date(), resp.getBody().getType(), resp.getBody().getData());
+            }
+
+        } catch (ApiRequestException e) {
             logger.error(
                     " Error al momento del diferimiento : " + e + "en el metodo createDiferimiento");
             apiResponse = new ApiResponse(e.getMessage(), String.valueOf(HttpStatus.CONFLICT.value()),
-                    HttpStatus.CONFLICT, new Date(), "",null);
-        }catch (Exception e) {
+                    HttpStatus.CONFLICT, new Date(), "", null);
+        } catch (Exception e) {
             logger.error(
                     " Error al momento de generar el diferimiento de deuda del cliente : " + e + "en el metodo createDiferimiento");
             apiResponse = new ApiResponse(e.getMessage(), String.valueOf(HttpStatus.BAD_REQUEST.value()),
@@ -69,91 +85,5 @@ public class DiferimientoController {
 
     }
 
-    @PostMapping(value = "/get/otp", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Object> getOtp(@RequestHeader String hash, HttpServletRequest req,
-                                         HttpServletResponse respo) {
-        logger.info("El cliente con el hash " + hash + " ha enviado una solicitud para generar OTP, con la IP \t"
-                + req.getRemoteAddr(), LOGGER_REQUEST_FORMAT);
-        ApiResponse apiResponse = null;
-        try {
-            if (!recaptchaService.valid(req, respo)) {
-                throw new ApiRequestException("La Captcha no ha podido ser validado :(");
-            }
-            ResponseEntity<ApiResponse> response=otpServices.generateOtp(hash,req);
-            if(response.getStatusCodeValue()==200){
-                apiResponse = new ApiResponse(response.getBody().getMessage(), String.valueOf(HttpStatus.OK.value()),
-                        HttpStatus.OK, new Date(), "", null);
-            }else{
-                System.out.println("Algo surgio mal");
-                apiResponse = new ApiResponse(response.getBody().getMessage(), String.valueOf(HttpStatus.BAD_REQUEST.value()),
-                        HttpStatus.BAD_REQUEST, new Date(), "", null);
-            }
-
-        }catch (ApiRequestException e) {
-            logger.error("Error al momento de consultar la informacion del cliente en el envio de otp : " + e
-                    + " \t en el metodo getOtp");
-            apiResponse = new ApiResponse(e.getMessage(), String.valueOf(HttpStatus.BAD_REQUEST.value()),
-                    HttpStatus.BAD_REQUEST, new Date(), "", null);
-        }catch (Exception e) {
-            logger.error(
-                    "Error al momento de generar el código OTP");
-            apiResponse = new ApiResponse(e.getMessage(), String.valueOf(HttpStatus.CONFLICT.value()),
-                    HttpStatus.CONFLICT, new Date(), "", null);
-        }
-        return new ResponseEntity<>(apiResponse, apiResponse.getStatus());
-    }
-
-
-    @PostMapping(value = "/validate/otp", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Object> validateOtp(@RequestBody RequestSolicitudOtp requestSolicitudOtp, HttpServletRequest req,
-                                              HttpServletResponse respo) {
-        logger.info("El cliente " + requestSolicitudOtp.getHash() + " ha enviado una solicitud para validar OTP, con la IP \t"
-                + req.getRemoteAddr(), LOGGER_REQUEST_FORMAT);
-        ApiResponse apiResponse = null;
-        try {
-            if (!recaptchaService.valid(req, respo)) {
-                throw new ApiRequestException("La Captcha no ha podido ser validado :(");
-            }
-            ResponseEntity<ApiResponse> response=otpServices.validateOtp(requestSolicitudOtp,req);
-            if(response.getStatusCodeValue()==200){
-                apiResponse = new ApiResponse(response.getBody().getMessage(), String.valueOf(HttpStatus.OK.value()),
-                        HttpStatus.OK, new Date(), "", null);
-            }else{
-                apiResponse = new ApiResponse(response.getBody().getMessage(), String.valueOf(HttpStatus.BAD_REQUEST.value()),
-                        HttpStatus.BAD_REQUEST, new Date(), "", null);
-            }
-
-        }catch (ApiRequestException e) {
-            logger.error("Error al momento de validar el otp del envio de otp : " + e
-                    + " \t en el metodo validateOtp");
-            apiResponse = new ApiResponse(e.getMessage(), String.valueOf(HttpStatus.BAD_REQUEST.value()),
-                    HttpStatus.BAD_REQUEST, new Date(), "", null);
-        }catch (Exception e) {
-            logger.error(
-                    "Error al momento de validar el código OTP");
-            apiResponse = new ApiResponse(e.getMessage(), String.valueOf(HttpStatus.CONFLICT.value()),
-                    HttpStatus.CONFLICT, new Date(), "", null);
-        }
-        return new ResponseEntity<>(apiResponse, apiResponse.getStatus());
-    }
-
-
-    @PostMapping(value="/cmb")
-    public ResponseEntity<Object> createDiferimientoCMB(@RequestHeader String hash, HttpServletRequest request){
-        logger.info("Iniciando la gestión del cliente : " + hash
-                + " desde la siguiente IP : " + request.getRemoteAddr(), LOGGER_REQUEST_FORMAT);
-        ApiResponse apiResponse = new ApiResponse();
-        try{
-            ResponseEntity<ApiResponse> resp=diferimientoServices.generateCmbOut(hash);
-            apiResponse = new ApiResponse(resp.getBody().getMessage(), String.valueOf(HttpStatus.OK.value()),
-                    HttpStatus.OK, new Date(), resp.getBody().getType() ,resp.getBody().getData());
-        }catch (Exception e) {
-            logger.error(
-                    " Error al momento de generar el diferimiento de deuda del cliente con el call me back : " + e + "en el metodo createDiferimientoCMB");
-            apiResponse = new ApiResponse(e.getMessage(), String.valueOf(HttpStatus.BAD_REQUEST.value()),
-                    HttpStatus.BAD_REQUEST, new Date(), "", null);
-        }
-        return new ResponseEntity<>(apiResponse, apiResponse.getStatus());
-    }
 
 }

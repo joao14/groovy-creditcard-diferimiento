@@ -7,6 +7,14 @@ import java.util.Collection;
 
 @Entity
 @Table(name = "dif_cliente")
+@NamedStoredProcedureQueries({
+        @NamedStoredProcedureQuery(
+                name = "bp_gestion_operaciones_habitar_preciso_autoseguro",
+                procedureName = "bp_gestion_operaciones_habitar_preciso_autoseguro",
+                parameters = {@StoredProcedureParameter(name = "identificacion", type = String.class, mode = ParameterMode.IN),
+                        @StoredProcedureParameter(name = "tipo", type = String.class, mode = ParameterMode.OUT)
+                })
+})
 @XmlRootElement
 public class DifCliente {
     private static final long serialVersionUID = 1L;
@@ -83,8 +91,24 @@ public class DifCliente {
     private String clieCanal;
     @Column(name = "clie_celular")
     private String clieCelular;
+    @Column(name = "clie_celularform")
+    private String clieCelularform;
+    @Column(name = "clie_corte")
+    private String clieCorte;
+    @Column(name = "clie_bin")
+    private String clieBin;
+    @Column(name = "clie_marca")
+    private String clieMarca;
+    @Column(name = "clie_codiclie")
+    private String clieCodiclie;
+    @Column(name = "clie_codipers")
+    private String clieCodipers;
+    @Column(name = "clie_cif")
+    private String clieCif;
     @Column(name = "clie_email")
     private String clieEmail;
+    @Column(name = "clie_emailform")
+    private String clieEmailform;
     @Column(name = "clie_estado")
     private String clieEstado;
     @Column(name = "clie_base")
@@ -98,14 +122,14 @@ public class DifCliente {
     public DifCliente() {
     }
 
-    public DifCliente(String clieIdentificacion, String clieIdenenma, String clieHashiden, String cliePrimnomb,String clieSegunomb, String cliePrimapell, String clieSeguapell, String clieNumepres, String clieFamilia, String clieCodiprod, Character clieDiasmora, String clieNombsist, String clieDiapago, String clieNombtipoconc, String clieMontcapivencer, String clieMontcapinodeve, String clieMontcapivencido, String clieMontcapitotal, String cliePresestaactu, String clieNumeopera, String clieActivo, String clieAsesor, String clieAgencia, String clieNombagen, String clieZona, String clieRegion, String clieSegmento, String clieSubsegmento, String cliePais, String clieProvincia, String clieTipo, String clieCanal, String clieCelular, String clieEmail, String clieEstado, DifBasecampa bacaId, String clieBase) {
+    public DifCliente(String clieIdentificacion, String clieIdenenma, String clieHashiden, String cliePrimnomb, String clieSegunomb, String cliePrimapell, String clieSeguapell, String clieNumepres, String clieFamilia, String clieCodiprod, Character clieDiasmora, String clieNombsist, String clieDiapago, String clieNombtipoconc, String clieMontcapivencer, String clieMontcapinodeve, String clieMontcapivencido, String clieMontcapitotal, String cliePresestaactu, String clieNumeopera, String clieActivo, String clieAsesor, String clieAgencia, String clieNombagen, String clieZona, String clieRegion, String clieSegmento, String clieSubsegmento, String cliePais, String clieProvincia, String clieTipo, String clieCanal, String clieCelular, String clieEmail, String clieEstado, DifBasecampa bacaId, String clieBase) {
         this.clieIdentificacion = clieIdentificacion;
         this.clieIdenenma = clieIdenenma;
         this.clieHashiden = clieHashiden;
-        this.cliePrimnomb= cliePrimnomb;
-        this.clieSegunomb= clieSegunomb;
-        this.cliePrimapell= cliePrimapell;
-        this.clieSeguapell= clieSeguapell;
+        this.cliePrimnomb = cliePrimnomb;
+        this.clieSegunomb = clieSegunomb;
+        this.cliePrimapell = cliePrimapell;
+        this.clieSeguapell = clieSeguapell;
         this.clieNumepres = clieNumepres;
         this.clieFamilia = clieFamilia;
         this.clieCodiprod = clieCodiprod;
@@ -442,10 +466,75 @@ public class DifCliente {
         this.bacaId = bacaId;
     }
 
+    public String getClieCorte() {
+        return clieCorte;
+    }
+
+    public void setClieCorte(String clieCorte) {
+        this.clieCorte = clieCorte;
+    }
+
+    public String getClieBin() {
+        return clieBin;
+    }
+
+    public void setClieBin(String clieBin) {
+        this.clieBin = clieBin;
+    }
+
+    public String getClieMarca() {
+        return clieMarca;
+    }
+
+    public void setClieMarca(String clieMarca) {
+        this.clieMarca = clieMarca;
+    }
+
+    public String getClieCodiclie() {
+        return clieCodiclie;
+    }
+
+    public void setClieCodiclie(String clieCodiclie) {
+        this.clieCodiclie = clieCodiclie;
+    }
+
+    public String getClieCodipers() {
+        return clieCodipers;
+    }
+
+    public void setClieCodipers(String clieCodipers) {
+        this.clieCodipers = clieCodipers;
+    }
+
+    public String getClieCif() {
+        return clieCif;
+    }
+
+    public void setClieCif(String clieCif) {
+        this.clieCif = clieCif;
+    }
+
+    public String getClieCelularform() {
+        return clieCelularform;
+    }
+
+    public void setClieCelularform(String clieCelularform) {
+        this.clieCelularform = clieCelularform;
+    }
+
+    public String getClieEmailform() {
+        return clieEmailform;
+    }
+
+    public void setClieEmailform(String clieEmailform) {
+        this.clieEmailform = clieEmailform;
+    }
+
     @XmlTransient
     public Collection<DifSolidife> getDifSolidifeCollection() {
         return difSolidifeCollection;
     }
+
     public void setDifSolidifeCollection(Collection<DifSolidife> difSolidifeCollection) {
         this.difSolidifeCollection = difSolidifeCollection;
     }

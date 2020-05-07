@@ -40,6 +40,10 @@ public class RequestCliente {
     @JsonProperty("email")
     String email;
 
+    @JsonPropertyOrder("6")
+    @JsonAlias("tipo")
+    @JsonProperty("tipo")
+    String tipo;
 
 
 }

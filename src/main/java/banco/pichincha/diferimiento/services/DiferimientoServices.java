@@ -11,6 +11,8 @@ import banco.pichincha.diferimiento.repository.ILogsDao;
 import banco.pichincha.diferimiento.repository.ISolidifeDao;
 import banco.pichincha.diferimiento.util.ApiResponse;
 import banco.pichincha.diferimiento.util.UtilResponse;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import org.slf4j.Logger;
@@ -36,6 +38,8 @@ public class DiferimientoServices {
     private static final String LOGGER_RESPONSE_FORMAT = "004-RES";
     private static final String LOGGER_REQUEST_FORMAT = "004-REQ";
     private static final Logger logger = LoggerFactory.getLogger(DiferimientoServices.class);
+    ObjectMapper mapper = new ObjectMapper();
+
     @Autowired
     Environment env;
     @Autowired
@@ -46,68 +50,121 @@ public class DiferimientoServices {
     private ISolidifeDao iSolidifeDao;
 
     public ResponseEntity<ApiResponse> createDiferimiento(RequestCliente requestCliente, HttpServletRequest request) {
-        logger.info("1.- Procesando el diferimiento de productos del cliente " + requestCliente.getIdentificacion(), LOGGER_REQUEST_FORMAT);
+        logger.info("1.- Procesando el diferimiento de productos créditos o tarjetas del cliente " + requestCliente.getIdentificacion(), LOGGER_REQUEST_FORMAT);
+        ApiResponse apiResponse = null;
+        ResponseDiferimiento resp_ = null;
+        switch (requestCliente.getTipo()) {
+            case "1"://CREDITO
+                apiResponse = this.procesoCredito(requestCliente, request);
+                //Se actualiza la información de los clientes de los datos ingresados desde el formulario
+                this.updateInfoCliente(requestCliente);
+                //apiResponse = this.flujoTemporal(requestCliente, request);
+                break;
+            case "2"://TARJETAS
+                apiResponse = this.procesoTarjetas(requestCliente, request);
+                break;
+            default:
+                logger.info("No se encuentra el tipo de flujo para la gestión posterior", LOGGER_RESPONSE_FORMAT);
+                apiResponse = new ApiResponse("No se encuentra el tipo de flujo para la gestión posterior", String.valueOf(HttpStatus.CONFLICT.value()), HttpStatus.CONFLICT, new Date(), "", null);
+                break;
+        }
+        //logger.info("4.- El proceso de diferimiento a finalizado correctamente", LOGGER_REQUEST_FORMAT);
+        return new ResponseEntity<>(apiResponse, apiResponse.getStatus());
+    }
+
+    /**
+     * Funcion que permite validar el proceso de creditos
+     *
+     * @param requestCliente
+     * @param request
+     * @return
+     */
+    public ApiResponse procesoCredito(RequestCliente requestCliente, HttpServletRequest request) {
         ApiResponse apiResponse = null;
         ResponseDiferimiento resp_ = null;
         try {
             logger.info("2.- Consultando el cliente dentro de la base de la campaña");
             //Consulta el cliente segun las campañas ingresada
-            DifCliente difCliente = iClienteDao.findByCliente(requestCliente.getIdentificacion());
-            logger.info("Cliente => " + difCliente, LOGGER_REQUEST_FORMAT);
+            List<DifCliente> lstSolicitudCliente = iClienteDao.findByCliente(requestCliente.getIdentificacion());
+            logger.info("El cliente [" + requestCliente.getIdentificacion() + "] tiene " + lstSolicitudCliente.size() + " solicitudes de diferimientos", LOGGER_REQUEST_FORMAT);
             //1.- Valida si el cliente se encuentra en campaña
-            if (difCliente != null) {
-                logger.info("3.- Empezar proceso de gestion de diferimientos ", LOGGER_REQUEST_FORMAT);
-                //Se valida si el cliente que esta en campaña y ya fué gestionado
-                DifSolidife difSolidife = iSolidifeDao.findSoliDifeByClient(difCliente.getClieId());
-                //2.- Validamos si el cliente tiene un clie_montcapitotal <= de 18000 seguirá el flujo de OTP
-                if (Float.parseFloat(difCliente.getClieMontcapitotal()) <= Float.parseFloat(env.getRequiredProperty("data.valor.total"))) {
-                    if (difSolidife == null) {
-                        resp_ = this.getFlujoSolicitudClientes("-1", difCliente, request);
-                        logger.warn("El cliente " + requestCliente.getIdentificacion() + " esta en proceso de realizar la gestión normal por OTP", LOGGER_RESPONSE_FORMAT);
-                        apiResponse = new ApiResponse("Diferimiento en proceso con gestión OTP", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.otp"), resp_);
-                    } else {
-                        if (Integer.valueOf(difSolidife.getSodiEstado()) != 1 && Integer.parseInt(difSolidife.getSodiEstado()) != 0) {
-                            resp_ = this.getFlujoSolicitudClientes("-2", difCliente, request);
-                            logger.warn("El cliente " + requestCliente.getIdentificacion() + " está intentando realizar el diferimiento como gestión normal de OTP nuevamente.", LOGGER_RESPONSE_FORMAT);
-                            apiResponse = new ApiResponse("Cliente intentando gestionar nuevamente", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.otp"), resp_);
-                        } else {
-                            logger.warn("El cliente " + requestCliente.getIdentificacion() + " ya realizó el diferimiento como gestión normal de OTP", LOGGER_RESPONSE_FORMAT);
-                            apiResponse = new ApiResponse("Cliente gestionado anteriormente", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.proceso.final"), null);
-                        }
-
-                    }
-
-                } else {
-                    if (difSolidife == null) {
-                        //3.- Valida si el prestamo es hipotecario o linea abierta o otro tipo
-                        switch (difCliente.getClieFamilia().toUpperCase()) {
-                            case "LINEA ABIERTA HIPOT.":
-                                resp_ = this.getFlujoSolicitudClientes("3", difCliente, request);
-                                logger.info("El cliente " + difCliente.getClieIdentificacion() + " realizó un diferimiento con producto LINEA ABIERTA mendiante gestión HABITAR", LOGGER_RESPONSE_FORMAT);
-                                apiResponse = new ApiResponse("Diferimiento en proceso con gestión HABITAR", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.posterior"), resp_);
-                                break;
-                            case "PRECISO HIPOTECARIO":
-                                resp_ = this.getFlujoSolicitudClientes("3", difCliente, request);
-                                logger.info("El cliente " + difCliente.getClieIdentificacion() + " realizó un diferimiento con producto HIPOTECARIO mendiante gestión HABITAR", LOGGER_RESPONSE_FORMAT);
-                                apiResponse = new ApiResponse("Diferimiento en proceso con gestión HABITAR", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.posterior"), resp_);
-                                break;
-                            default:
-                                resp_ = this.getFlujoSolicitudClientes("2", difCliente, request);
-                                logger.info("El cliente " + difCliente.getClieIdentificacion() + " realizó un diferimiento con producto mayor a 18000 mendiante gestión FVT", LOGGER_RESPONSE_FORMAT);
-                                apiResponse = new ApiResponse("Diferimiento en proceso con gestión FVT", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.posterior"), resp_);
-                                break;
-                        }
-                    } else {
-                        logger.warn("El cliente " + requestCliente.getIdentificacion() + " ya realizó el diferimiento como gestión posterior en HABITAR O FVT", LOGGER_RESPONSE_FORMAT);
+            if (lstSolicitudCliente != null && lstSolicitudCliente.size() > 0) {
+                logger.info("3.- Empezar proceso de gestion de diferimientos del cliente [" + lstSolicitudCliente.get(0).getClieIdentificacion() + "]", LOGGER_REQUEST_FORMAT);
+                //Se obtiene el primer cliente
+                DifCliente difClientTemporal = lstSolicitudCliente.get(0);
+                //Se valida si el cliente que esta en campaña ya fué gestionado
+                DifSolidife difSolidife = iSolidifeDao.findSoliDifeByClient(difClientTemporal.getClieId());
+                //Valida si el cliente tiene un flujo operaciones habitar + preciso1 + preciso2 + autoseguro
+                logger.info("4.- Empezar proceso de obtener la relacion de preciso + habitar + autoseguro", LOGGER_REQUEST_FORMAT);
+                String tipo = iClienteDao.getTypeRelacionPrecisoHabitarAutoseguro(requestCliente.getIdentificacion());
+                if (!tipo.equals("N/A")) {
+                    if (tipo.equals("GESTION")) {//Ya fue gestionado
+                        logger.info("El cliente " + difClientTemporal.getClieIdentificacion() + " ya fué gestionado anteriormente con HABITAR ya que tuvo una relación (HABITAR+PRECISO+AUTOSEGURO) ", LOGGER_REQUEST_FORMAT);
                         apiResponse = new ApiResponse("Cliente gestionado anteriormente ", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.proceso.final"), null);
+                    } else {
+                        logger.info("El cliente " + difClientTemporal.getClieIdentificacion() + " fué gestionado con HABITAR ya que tiene una relación (HABITAR+PRECISO+AUTOSEGURO) ", LOGGER_REQUEST_FORMAT);
+                        apiResponse = new ApiResponse("Cliente gestionado con gestión posterior",
+                                String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(),
+                                env.getRequiredProperty("data.estado.flujo.gestion.posterior"), null);
+                    }
+                } else {
+                    //2.- Validamos si el cliente tiene un clie_montcapitotal <= de 18000 seguirá el flujo de OTP
+                    String monto_validar = difClientTemporal.getClieMontcapitotal().isEmpty() || difClientTemporal.getClieMontcapitotal() == null ? difClientTemporal.getClieMontcapivencer() : difClientTemporal.getClieMontcapitotal();
+                    if (Float.parseFloat(monto_validar) <= Float.parseFloat(env.getRequiredProperty("data.valor.total"))) {
+                        if (difSolidife == null) {
+                            resp_ = this.getFlujoSolicitudClientes("-1", difClientTemporal, request);
+                            logger.warn("El cliente " + requestCliente.getIdentificacion() + " esta en proceso de realizar la gestión normal por OTP", LOGGER_RESPONSE_FORMAT);
+                            apiResponse = new ApiResponse("Diferimiento en proceso con gestión OTP", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.otp"), resp_);
+                        } else {
+                            if (Integer.valueOf(difSolidife.getSodiEstado()) != 1 && Integer.parseInt(difSolidife.getSodiEstado()) != 0) {
+                                resp_ = this.getFlujoSolicitudClientes("-2", difClientTemporal, request);
+                                logger.warn("El cliente " + requestCliente.getIdentificacion() + " está intentando realizar el diferimiento como gestión normal de OTP nuevamente.", LOGGER_RESPONSE_FORMAT);
+                                apiResponse = new ApiResponse("Cliente intentando gestionar nuevamente", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.otp"), resp_);
+                            } else {
+                                logger.warn("El cliente " + requestCliente.getIdentificacion() + " ya realizó el diferimiento como gestión normal de OTP", LOGGER_RESPONSE_FORMAT);
+                                apiResponse = new ApiResponse("Cliente gestionado anteriormente", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.proceso.final"), null);
+                            }
+
+                        }
+
+                    } else {
+                        if (difSolidife == null) {
+                            //3.- Valida si el prestamo es hipotecario o linea abierta o otro tipo
+                            switch (difClientTemporal.getClieFamilia().toUpperCase()) {
+                                case "LINEA ABIERTA HIPOT.":
+                                    resp_ = this.getFlujoSolicitudClientes("3", difClientTemporal, request);
+                                    logger.info("El cliente " + difClientTemporal.getClieIdentificacion() + " realizó un diferimiento con producto LINEA ABIERTA mendiante gestión HABITAR", LOGGER_RESPONSE_FORMAT);
+                                    apiResponse = new ApiResponse("Diferimiento en proceso con gestión HABITAR", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.posterior"), resp_);
+                                    break;
+                                case "PRECISO HIPOTECARIO":
+                                    resp_ = this.getFlujoSolicitudClientes("3", difClientTemporal, request);
+                                    logger.info("El cliente " + difClientTemporal.getClieIdentificacion() + " realizó un diferimiento con producto HIPOTECARIO mendiante gestión HABITAR", LOGGER_RESPONSE_FORMAT);
+                                    apiResponse = new ApiResponse("Diferimiento en proceso con gestión HABITAR", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.posterior"), resp_);
+                                    break;
+                                case "HABITAR GAF":
+                                    resp_ = this.getFlujoSolicitudClientes("3", difClientTemporal, request);
+                                    logger.info("El cliente " + difClientTemporal.getClieIdentificacion() + " realizó un diferimiento con producto HABITAR GAF mendiante gestión HABITAR", LOGGER_RESPONSE_FORMAT);
+                                    apiResponse = new ApiResponse("Diferimiento en proceso con gestión HABITAR", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.posterior"), resp_);
+                                    break;
+                                default:
+                                    resp_ = this.getFlujoSolicitudClientes("2", difClientTemporal, request);
+                                    logger.info("El cliente " + difClientTemporal.getClieIdentificacion() + " realizó un diferimiento con producto mayor a 18000 mendiante gestión FVT", LOGGER_RESPONSE_FORMAT);
+                                    apiResponse = new ApiResponse("Diferimiento en proceso con gestión FVT", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.posterior"), resp_);
+                                    break;
+                            }
+                        } else {
+                            logger.warn("El cliente " + requestCliente.getIdentificacion() + " ya realizó el diferimiento como gestión posterior en HABITAR O FVT", LOGGER_RESPONSE_FORMAT);
+                            apiResponse = new ApiResponse("Cliente gestionado anteriormente ", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.proceso.final"), null);
+                        }
                     }
                 }
+
             } else {
                 logger.info("El cliente " + requestCliente.getIdentificacion() + " no se encuentra en la campaña para los diferimientos", LOGGER_REQUEST_FORMAT);
                 //Se valida si el no cliente ya fue registrado
                 DifLogs difLogs = iLogsDao.findByNoCliente(requestCliente.getIdentificacion());
                 if (difLogs == null) {
-                    resp_ = this.getFlujoDiferimientoNoClientes(requestCliente, request);
+                    resp_ = this.getFlujoDiferimientoNoClientes(requestCliente, "1", request);
                     logger.info("El cliente " + requestCliente.getIdentificacion() + " no a sido gestionado como no cliente y se guardará en la base de datos", LOGGER_RESPONSE_FORMAT);
                     apiResponse = new ApiResponse("Diferimiento en proceso con gestión NO CLIENTES EN BASE ", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.sinBase"), resp_);
                 } else {
@@ -116,13 +173,70 @@ public class DiferimientoServices {
                 }
 
             }
-        } catch (ApiRequestException e) {
-            logger.error("Uups, surgio un error al realizar un diferimiento de cuota para el usuario \t " + requestCliente.getIdentificacion(), e);
+        } catch (ApiRequestException a) {
+            logger.error("Uups, surgio un error al realizar un diferimiento de cuota para el usuario \t " + requestCliente.getIdentificacion(), a);
             throw new ApiRequestException("No se pudo generar el diferimiento");
         }
 
-        logger.info("4.- El proceso de diferimiento a finalizado correctamente", LOGGER_REQUEST_FORMAT);
-        return new ResponseEntity<>(apiResponse, apiResponse.getStatus());
+        return apiResponse;
+    }
+
+
+    /**
+     * Funcion temporal para ingreso de clientes sin ninguna campaña
+     *
+     * @param requestCliente
+     * @param request
+     * @return
+     */
+    private ApiResponse flujoTemporal(RequestCliente requestCliente, HttpServletRequest request) {
+        ApiResponse apiResponse = null;
+        ResponseDiferimiento resp_ = null;
+        logger.info("El cliente " + requestCliente.getIdentificacion() + " va a ingresar como diferimiento pero sin ningun canal de gestión.", LOGGER_REQUEST_FORMAT);
+        //Se valida si el no cliente ya fue registrado
+        DifLogs difLogs = iLogsDao.findByNoCliente(requestCliente.getIdentificacion());
+        if (difLogs == null) {
+            resp_ = this.getFlujoDiferimientoNoClientes(requestCliente, "2", request);
+            logger.info("El cliente " + requestCliente.getIdentificacion() + " no a sido gestionado como no cliente y se guardará en la base de datos", LOGGER_RESPONSE_FORMAT);
+            apiResponse = new ApiResponse("Diferimiento en proceso con gestión NO CLIENTES EN BASE ", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.sinBase"), resp_);
+        } else {
+            logger.warn("El cliente " + requestCliente.getIdentificacion() + "ya fue gestionado como no cliente en la base de datos", LOGGER_RESPONSE_FORMAT);
+            apiResponse = new ApiResponse("Cliente gestionado anteriormente ", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.proceso.final"), null);
+        }
+
+        return apiResponse;
+    }
+
+    /**
+     * Funcion que permite validar el proceso con tarjetas
+     *
+     * @param requestCliente
+     * @param request
+     * @return
+     */
+    public ApiResponse procesoTarjetas(RequestCliente requestCliente, HttpServletRequest request) {
+        ApiResponse apiResponse = null;
+        ResponseDiferimiento resp_ = null;
+        try {
+
+            logger.info("2.- Consultando el cliente dentro de la base de la campaña de tarjetas");
+            //Consulta el cliente segun las campañas ingresada
+            DifCliente difCliente = iClienteDao.findByTarjetaCliente(requestCliente.getIdentificacion(), 2);
+            logger.info("Cliente de tarjetas => " + difCliente, LOGGER_REQUEST_FORMAT);
+            if (difCliente != null) {
+                logger.info("3.- Empezar proceso de gestion de diferimientos de tarjetas", LOGGER_REQUEST_FORMAT);
+                logger.warn("El cliente " + requestCliente.getIdentificacion() + " esta en proceso de realizar la gestión normal por OTP", LOGGER_RESPONSE_FORMAT);
+                apiResponse = new ApiResponse("Diferimiento en proceso con gestión OTP", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.tarjetas"), difCliente);
+            } else {
+                logger.error("El cliente " + requestCliente.getIdentificacion() + " no se encuentra en la campaña de tarjetas para los diferimientos", LOGGER_REQUEST_FORMAT);
+                apiResponse = new ApiResponse("Cliente no se encuentra en campaña", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), "", null);
+            }
+
+        } catch (ApiRequestException e) {
+            logger.error("Uups, surgio un error al realizar un diferimiento de tarjetas para el usuario \t " + requestCliente.getIdentificacion(), e);
+            throw new ApiRequestException("No se pudo generar el diferimiento de tarjetas");
+        }
+        return apiResponse;
     }
 
     /**
@@ -131,7 +245,7 @@ public class DiferimientoServices {
      * @param requestCliente
      * @param request
      */
-    private ResponseDiferimiento getFlujoDiferimientoNoClientes(RequestCliente requestCliente, HttpServletRequest request) {
+    private ResponseDiferimiento getFlujoDiferimientoNoClientes(RequestCliente requestCliente, String tipo, HttpServletRequest request) {
         DifLogs difLogs = new DifLogs();
         difLogs.setLogIdentificacion(requestCliente.getIdentificacion());
         difLogs.setLogNombres(requestCliente.getNombres());
@@ -139,6 +253,7 @@ public class DiferimientoServices {
         difLogs.setLogTelefono(requestCliente.getTelefono());
         difLogs.setLogEmail(requestCliente.getEmail());
         difLogs.setLogIp(request.getRemoteAddr());
+        difLogs.setLogTipo(tipo);
         this.iLogsDao.save(difLogs);
 
         return this.createObject(null, difLogs, "C-2", "");
@@ -251,6 +366,21 @@ public class DiferimientoServices {
             throw new ApiRequestException("No se pudo generar el diferimiento");
         }
         return new ResponseEntity<>(apiResponse, apiResponse.getStatus());
+    }
+
+    /**
+     * Descripcion:
+     * Funcion que permite actualizar el email y el celular del cliente sobre los datos ingresados
+     *
+     * @param requestCliente
+     */
+    public void updateInfoCliente(RequestCliente requestCliente) {
+        logger.info("Inicio el proceso de actualizaión de los campos celular/email del cliente [" + requestCliente.getIdentificacion() + "]", LOGGER_REQUEST_FORMAT);
+        try {
+            iClienteDao.changeValuesEmailPhoneOfClient(requestCliente.getTelefono(), requestCliente.getEmail(), requestCliente.getIdentificacion());
+        } catch (Exception e) {
+            logger.error("Error en la actualización de datos del cliente " + e.getMessage(), LOGGER_RESPONSE_FORMAT);
+        }
     }
 
 

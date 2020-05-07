@@ -9,7 +9,6 @@ import java.io.Serializable;
 import java.util.Date;
 
 /**
- *
  * @author gamerino
  */
 @Entity
@@ -41,6 +40,9 @@ public class DifLogs implements Serializable {
     @Basic(optional = false)
     @Column(name = "log_ip")
     private String logIp;
+    @Basic(optional = false)
+    @Column(name = "log_tipo")
+    private String logTipo;
     @Generated(GenerationTime.INSERT)
     @Basic(optional = false)
     @Column(name = "log_fechahora")
@@ -125,6 +127,12 @@ public class DifLogs implements Serializable {
 
     public void setLogFechahora(Date logFechahora) {
         this.logFechahora = logFechahora;
+    }
+
+    public String getLogTipo() {return logTipo;}
+
+    public void setLogTipo(String logTipo) {
+        this.logTipo = logTipo;
     }
 
     @Override
