@@ -251,6 +251,21 @@ public class OtpServices {
         }
     }
 
+    /**
+     * Funcion que permite buscar el producto para gestión habitar
+     *
+     * @param name_producto
+     * @return
+     */
+    private String getManagerProductHabitar(String name_producto) {
+        String[] lstProductos = {"habitar", "linea", "preciso hipotecario", "fideicomiso"};
+        for (String producto : lstProductos) {
+            if (name_producto.toUpperCase().contains(producto.toUpperCase()))
+                return "Y";
+        }
+        return "N";
+    }
+
 
     /**
      * Descripcion:
@@ -265,8 +280,17 @@ public class OtpServices {
         }
         logger.info("El total de solicitudes menores a 18000 a procesar = " + lstClienteMenores18000.size() + " para el cliente " + difCliente.getClieIdentificacion(), LOGGER_RESPONSE_FORMAT);
         List<DifCliente> lstClienteMayores18000 = iClienteDao.findByCreditosClienteMayores18000(difCliente.getClieIdentificacion(), difCliente.getClieId());
-        for (DifCliente cliente : lstClienteMayores18000) {//Gestión FVT
-            this.gestionOtherSolicitudes(cliente, "2");
+        for (DifCliente cliente : lstClienteMayores18000) {//Gestión FVT o HABITAR
+            switch (this.getManagerProductHabitar(cliente.getClieFamilia())) {
+                case "Y":
+                    //HABITAR
+                    this.gestionOtherSolicitudes(cliente, "3");
+                default:
+                    //FVT
+                    this.gestionOtherSolicitudes(cliente, "2");
+                    break;
+            }
+
         }
         logger.info("El total de solicitudes mayores a 18000 a procesar = " + lstClienteMayores18000.size() + " para el cliente " + difCliente.getClieIdentificacion(), LOGGER_RESPONSE_FORMAT);
 

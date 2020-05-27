@@ -130,20 +130,10 @@ public class DiferimientoServices {
                     } else {
                         if (difSolidife == null) {
                             //3.- Valida si el prestamo es hipotecario o linea abierta o otro tipo
-                            switch (difClientTemporal.getClieFamilia().toUpperCase()) {
-                                case "LINEA ABIERTA HIPOT.":
+                            switch (this.getManagerProductHabitar(difClientTemporal.getClieFamilia())) {
+                                case "Y":
                                     resp_ = this.getFlujoSolicitudClientes("3", difClientTemporal, request);
-                                    logger.info("El cliente " + difClientTemporal.getClieIdentificacion() + " realizó un diferimiento con producto LINEA ABIERTA mendiante gestión HABITAR", LOGGER_RESPONSE_FORMAT);
-                                    apiResponse = new ApiResponse("Diferimiento en proceso con gestión HABITAR", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.posterior"), resp_);
-                                    break;
-                                case "PRECISO HIPOTECARIO":
-                                    resp_ = this.getFlujoSolicitudClientes("3", difClientTemporal, request);
-                                    logger.info("El cliente " + difClientTemporal.getClieIdentificacion() + " realizó un diferimiento con producto HIPOTECARIO mendiante gestión HABITAR", LOGGER_RESPONSE_FORMAT);
-                                    apiResponse = new ApiResponse("Diferimiento en proceso con gestión HABITAR", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.posterior"), resp_);
-                                    break;
-                                case "HABITAR GAF":
-                                    resp_ = this.getFlujoSolicitudClientes("3", difClientTemporal, request);
-                                    logger.info("El cliente " + difClientTemporal.getClieIdentificacion() + " realizó un diferimiento con producto HABITAR GAF mendiante gestión HABITAR", LOGGER_RESPONSE_FORMAT);
+                                    logger.info("El cliente " + difClientTemporal.getClieIdentificacion() + " realizó un diferimiento con producto " + difClientTemporal.getClieFamilia() + " mendiante gestión HABITAR", LOGGER_RESPONSE_FORMAT);
                                     apiResponse = new ApiResponse("Diferimiento en proceso con gestión HABITAR", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.posterior"), resp_);
                                     break;
                                 default:
@@ -179,6 +169,22 @@ public class DiferimientoServices {
         }
 
         return apiResponse;
+    }
+
+
+    /**
+     * Funcion que permite buscar el producto para gestión habitar
+     *
+     * @param name_producto
+     * @return
+     */
+    private String getManagerProductHabitar(String name_producto) {
+        String[] lstProductos = {"habitar", "linea", "preciso hipotecario", "fideicomiso"};
+        for (String producto : lstProductos) {
+            if (name_producto.toUpperCase().contains(producto.toUpperCase()))
+                return "Y";
+        }
+        return "N";
     }
 
 

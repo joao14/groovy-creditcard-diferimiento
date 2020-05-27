@@ -111,6 +111,8 @@ public class DifCliente {
     private String clieEmailform;
     @Column(name = "clie_estado")
     private String clieEstado;
+    @Column(name = "clie_aplidife")
+    private String clieAplidife;
     @Column(name = "clie_base")
     private String clieBase;
     @JoinColumn(name = "baca_id", referencedColumnName = "baca_id")
