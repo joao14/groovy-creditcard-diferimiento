@@ -3,12 +3,14 @@ package banco.pichincha.diferimiento.services;
 import banco.pichincha.diferimiento.dto.DifCliente;
 import banco.pichincha.diferimiento.dto.DifLogs;
 import banco.pichincha.diferimiento.dto.DifSolidife;
+import banco.pichincha.diferimiento.dto.DifSolinodife;
 import banco.pichincha.diferimiento.exception.ApiRequestException;
 import banco.pichincha.diferimiento.model.RequestCliente;
 import banco.pichincha.diferimiento.model.ResponseDiferimiento;
 import banco.pichincha.diferimiento.repository.IClienteDao;
 import banco.pichincha.diferimiento.repository.ILogsDao;
 import banco.pichincha.diferimiento.repository.ISolidifeDao;
+import banco.pichincha.diferimiento.repository.ISolinodifeDao;
 import banco.pichincha.diferimiento.util.ApiResponse;
 import banco.pichincha.diferimiento.util.UtilResponse;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -49,6 +51,9 @@ public class DiferimientoServices {
     @Autowired
     private ISolidifeDao iSolidifeDao;
 
+    @Autowired
+    private ISolinodifeDao iSolinodifeDao;
+
     public ResponseEntity<ApiResponse> createDiferimiento(RequestCliente requestCliente, HttpServletRequest request) {
         logger.info("1.- Procesando el diferimiento de productos créditos o tarjetas del cliente " + requestCliente.getIdentificacion(), LOGGER_REQUEST_FORMAT);
         ApiResponse apiResponse = null;
@@ -83,85 +88,103 @@ public class DiferimientoServices {
         ApiResponse apiResponse = null;
         ResponseDiferimiento resp_ = null;
         try {
-            logger.info("2.- Consultando el cliente dentro de la base de la campaña");
-            //Consulta el cliente segun las campañas ingresada
-            List<DifCliente> lstSolicitudCliente = iClienteDao.findByCliente(requestCliente.getIdentificacion());
-            logger.info("El cliente [" + requestCliente.getIdentificacion() + "] tiene " + lstSolicitudCliente.size() + " solicitudes de diferimientos", LOGGER_REQUEST_FORMAT);
-            //1.- Valida si el cliente se encuentra en campaña
-            if (lstSolicitudCliente != null && lstSolicitudCliente.size() > 0) {
-                logger.info("3.- Empezar proceso de gestion de diferimientos del cliente [" + lstSolicitudCliente.get(0).getClieIdentificacion() + "]", LOGGER_REQUEST_FORMAT);
-                //Se obtiene el primer cliente
-                DifCliente difClientTemporal = lstSolicitudCliente.get(0);
-                //Se valida si el cliente que esta en campaña ya fué gestionado
-                DifSolidife difSolidife = iSolidifeDao.findSoliDifeByClient(difClientTemporal.getClieId());
-                //Valida si el cliente tiene un flujo operaciones habitar + preciso1 + preciso2 + autoseguro
-                logger.info("4.- Empezar proceso de obtener la relacion de preciso + habitar + autoseguro", LOGGER_REQUEST_FORMAT);
-                String tipo = iClienteDao.getTypeRelacionPrecisoHabitarAutoseguro(requestCliente.getIdentificacion());
-                if (!tipo.equals("N/A")) {
-                    if (tipo.equals("GESTION")) {//Ya fue gestionado
-                        logger.info("El cliente " + difClientTemporal.getClieIdentificacion() + " ya fué gestionado anteriormente con HABITAR ya que tuvo una relación (HABITAR+PRECISO+AUTOSEGURO) ", LOGGER_REQUEST_FORMAT);
-                        apiResponse = new ApiResponse("Cliente gestionado anteriormente ", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.proceso.final"), null);
-                    } else {
-                        logger.info("El cliente " + difClientTemporal.getClieIdentificacion() + " fué gestionado con HABITAR ya que tiene una relación (HABITAR+PRECISO+AUTOSEGURO) ", LOGGER_REQUEST_FORMAT);
-                        apiResponse = new ApiResponse("Cliente gestionado con gestión posterior",
-                                String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(),
-                                env.getRequiredProperty("data.estado.flujo.gestion.posterior"), null);
-                    }
+            logger.info("1.- Consultando si el cliente no aplica al diferimiento");
+            List<DifCliente> lstSoliClientNoApplyDiffer = iClienteDao.findByClientNoApplyDiffer(requestCliente.getIdentificacion());
+            if (lstSoliClientNoApplyDiffer != null) {
+                logger.info("El cliente [" + requestCliente.getIdentificacion() + "] está en base de clientes que no aplican a un diferimiento y se gestionará para flujo de call center.", LOGGER_REQUEST_FORMAT);
+                DifSolinodife difSolinodife = iSolinodifeDao.findSolinoDifeByClient(lstSoliClientNoApplyDiffer.get(0).getClieId(), lstSoliClientNoApplyDiffer.get(0).getBacaId().getBacaId());
+                if (difSolinodife != null) {
+                    logger.warn("El cliente " + requestCliente.getIdentificacion() + " ya gestiono un no diferimiento para la campaña " + lstSoliClientNoApplyDiffer.get(0).getBacaId().getBacaId(), LOGGER_RESPONSE_FORMAT);
+                    apiResponse = new ApiResponse("Cliente gestionado anteriormente", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.proceso.final"), null);
                 } else {
-                    //2.- Validamos si el cliente tiene un clie_montcapitotal <= de 18000 seguirá el flujo de OTP
-                    String monto_validar = difClientTemporal.getClieMontcapitotal().isEmpty() || difClientTemporal.getClieMontcapitotal() == null ? difClientTemporal.getClieMontcapivencer() : difClientTemporal.getClieMontcapitotal();
-                    if (Float.parseFloat(monto_validar) <= Float.parseFloat(env.getRequiredProperty("data.valor.total"))) {
-                        if (difSolidife == null) {
-                            resp_ = this.getFlujoSolicitudClientes("-1", difClientTemporal, request);
-                            logger.warn("El cliente " + requestCliente.getIdentificacion() + " esta en proceso de realizar la gestión normal por OTP", LOGGER_RESPONSE_FORMAT);
-                            apiResponse = new ApiResponse("Diferimiento en proceso con gestión OTP", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.otp"), resp_);
-                        } else {
-                            if (Integer.valueOf(difSolidife.getSodiEstado()) != 1 && Integer.parseInt(difSolidife.getSodiEstado()) != 0) {
-                                resp_ = this.getFlujoSolicitudClientes("-2", difClientTemporal, request);
-                                logger.warn("El cliente " + requestCliente.getIdentificacion() + " está intentando realizar el diferimiento como gestión normal de OTP nuevamente.", LOGGER_RESPONSE_FORMAT);
-                                apiResponse = new ApiResponse("Cliente intentando gestionar nuevamente", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.otp"), resp_);
-                            } else {
-                                logger.warn("El cliente " + requestCliente.getIdentificacion() + " ya realizó el diferimiento como gestión normal de OTP", LOGGER_RESPONSE_FORMAT);
-                                apiResponse = new ApiResponse("Cliente gestionado anteriormente", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.proceso.final"), null);
-                            }
-
-                        }
-
-                    } else {
-                        if (difSolidife == null) {
-                            //3.- Valida si el prestamo es hipotecario o linea abierta o otro tipo
-                            switch (this.getManagerProductHabitar(difClientTemporal.getClieFamilia())) {
-                                case "Y":
-                                    resp_ = this.getFlujoSolicitudClientes("3", difClientTemporal, request);
-                                    logger.info("El cliente " + difClientTemporal.getClieIdentificacion() + " realizó un diferimiento con producto " + difClientTemporal.getClieFamilia() + " mendiante gestión HABITAR", LOGGER_RESPONSE_FORMAT);
-                                    apiResponse = new ApiResponse("Diferimiento en proceso con gestión HABITAR", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.posterior"), resp_);
-                                    break;
-                                default:
-                                    resp_ = this.getFlujoSolicitudClientes("2", difClientTemporal, request);
-                                    logger.info("El cliente " + difClientTemporal.getClieIdentificacion() + " realizó un diferimiento con producto mayor a 18000 mendiante gestión FVT", LOGGER_RESPONSE_FORMAT);
-                                    apiResponse = new ApiResponse("Diferimiento en proceso con gestión FVT", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.posterior"), resp_);
-                                    break;
-                            }
-                        } else {
-                            logger.warn("El cliente " + requestCliente.getIdentificacion() + " ya realizó el diferimiento como gestión posterior en HABITAR O FVT", LOGGER_RESPONSE_FORMAT);
-                            apiResponse = new ApiResponse("Cliente gestionado anteriormente ", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.proceso.final"), null);
-                        }
-                    }
+                    DifCliente difClienteTempNoApply = lstSoliClientNoApplyDiffer.get(0);
+                    //Se ingresa al flujo correspondiente
+                    this.getFlujoSolicitudNoAppplyClientes(difClienteTempNoApply);
+                    ResponseDiferimiento resp = createObject(difClienteTempNoApply, null, "C-3", "", requestCliente);
+                    logger.info("El cliente [" + requestCliente.getIdentificacion() + "] en la campaña [" + difClienteTempNoApply.getBacaId().getBacaId() + "] va hacer gestionado por un no diferimiento por call center.", LOGGER_REQUEST_FORMAT);
+                    apiResponse = new ApiResponse("Cliente no aplica a diferimiento", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.proceso.no.aplican.diferimientos"), resp);
                 }
-
             } else {
-                logger.info("El cliente " + requestCliente.getIdentificacion() + " no se encuentra en la campaña para los diferimientos", LOGGER_REQUEST_FORMAT);
-                //Se valida si el no cliente ya fue registrado
-                DifLogs difLogs = iLogsDao.findByNoCliente(requestCliente.getIdentificacion());
-                if (difLogs == null) {
-                    resp_ = this.getFlujoDiferimientoNoClientes(requestCliente, "1", request);
-                    logger.info("El cliente " + requestCliente.getIdentificacion() + " no a sido gestionado como no cliente y se guardará en la base de datos", LOGGER_RESPONSE_FORMAT);
-                    apiResponse = new ApiResponse("Diferimiento en proceso con gestión NO CLIENTES EN BASE ", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.sinBase"), resp_);
-                } else {
-                    logger.warn("El cliente " + requestCliente.getIdentificacion() + "ya fue gestionado como no cliente en la base de datos", LOGGER_RESPONSE_FORMAT);
-                    apiResponse = new ApiResponse("Cliente gestionado anteriormente ", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.proceso.final"), null);
-                }
+                logger.info("2.- Consultando el cliente dentro de la base de la campaña");
+                //Consulta el cliente segun las campañas ingresada
+                List<DifCliente> lstSolicitudCliente = iClienteDao.findByCliente(requestCliente.getIdentificacion());
+                logger.info("El cliente [" + requestCliente.getIdentificacion() + "] tiene " + lstSolicitudCliente.size() + " solicitudes de diferimientos", LOGGER_REQUEST_FORMAT);
+                //1.- Valida si el cliente se encuentra en campaña
+                if (lstSolicitudCliente != null && lstSolicitudCliente.size() > 0) {
+                    logger.info("3.- Empezar proceso de gestion de diferimientos del cliente [" + lstSolicitudCliente.get(0).getClieIdentificacion() + "]", LOGGER_REQUEST_FORMAT);
+                    //Se obtiene el primer cliente
+                    DifCliente difClientTemporal = lstSolicitudCliente.get(0);
+                    //Se valida si el cliente que esta en campaña ya fué gestionado
+                    DifSolidife difSolidife = iSolidifeDao.findSoliDifeByClient(difClientTemporal.getClieId());
+                    //Valida si el cliente tiene un flujo operaciones habitar + preciso1 + preciso2 + autoseguro
+                    logger.info("4.- Empezar proceso de obtener la relacion de preciso + habitar + autoseguro", LOGGER_REQUEST_FORMAT);
+                    String tipo = iClienteDao.getTypeRelacionPrecisoHabitarAutoseguro(requestCliente.getIdentificacion());
+                    if (!tipo.equals("N/A")) {
+                        if (tipo.equals("GESTION")) {//Ya fue gestionado
+                            logger.info("El cliente " + difClientTemporal.getClieIdentificacion() + " ya fué gestionado anteriormente con HABITAR ya que tuvo una relación (HABITAR+PRECISO+AUTOSEGURO) ", LOGGER_REQUEST_FORMAT);
+                            apiResponse = new ApiResponse("Cliente gestionado anteriormente ", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.proceso.final"), null);
+                        } else {
+                            logger.info("El cliente " + difClientTemporal.getClieIdentificacion() + " fué gestionado con HABITAR ya que tiene una relación (HABITAR+PRECISO+AUTOSEGURO) ", LOGGER_REQUEST_FORMAT);
+                            apiResponse = new ApiResponse("Cliente gestionado con gestión posterior",
+                                    String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(),
+                                    env.getRequiredProperty("data.estado.flujo.gestion.posterior"), null);
+                        }
+                    } else {
+                        //2.- Validamos si el cliente tiene un clie_montcapitotal <= de 18000 seguirá el flujo de OTP
+                        String monto_validar = difClientTemporal.getClieMontcapitotal().isEmpty() || difClientTemporal.getClieMontcapitotal() == null ? difClientTemporal.getClieMontcapivencer() : difClientTemporal.getClieMontcapitotal();
+                        if (Float.parseFloat(monto_validar) <= Float.parseFloat(env.getRequiredProperty("data.valor.total"))) {
+                            if (difSolidife == null) {
+                                resp_ = this.getFlujoSolicitudClientes("-1", difClientTemporal, request, requestCliente);
+                                logger.warn("El cliente " + requestCliente.getIdentificacion() + " esta en proceso de realizar la gestión normal por OTP", LOGGER_RESPONSE_FORMAT);
+                                apiResponse = new ApiResponse("Diferimiento en proceso con gestión OTP", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.otp"), resp_);
+                            } else {
+                                if (Integer.valueOf(difSolidife.getSodiEstado()) != 1 && Integer.parseInt(difSolidife.getSodiEstado()) != 0) {
+                                    resp_ = this.getFlujoSolicitudClientes("-2", difClientTemporal, request, requestCliente);
+                                    logger.warn("El cliente " + requestCliente.getIdentificacion() + " está intentando realizar el diferimiento como gestión normal de OTP nuevamente.", LOGGER_RESPONSE_FORMAT);
+                                    apiResponse = new ApiResponse("Cliente intentando gestionar nuevamente", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.otp"), resp_);
+                                } else {
+                                    logger.warn("El cliente " + requestCliente.getIdentificacion() + " ya realizó el diferimiento como gestión normal de OTP", LOGGER_RESPONSE_FORMAT);
+                                    apiResponse = new ApiResponse("Cliente gestionado anteriormente", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.proceso.final"), null);
+                                }
 
+                            }
+
+                        } else {
+                            if (difSolidife == null) {
+                                //3.- Valida si el prestamo es hipotecario o linea abierta o otro tipo
+                                switch (this.getManagerProductHabitar(difClientTemporal.getClieFamilia())) {
+                                    case "Y":
+                                        resp_ = this.getFlujoSolicitudClientes("3", difClientTemporal, request, requestCliente);
+                                        logger.info("El cliente " + difClientTemporal.getClieIdentificacion() + " realizó un diferimiento con producto " + difClientTemporal.getClieFamilia() + " mendiante gestión HABITAR", LOGGER_RESPONSE_FORMAT);
+                                        apiResponse = new ApiResponse("Diferimiento en proceso con gestión HABITAR", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.posterior"), resp_);
+                                        break;
+                                    default:
+                                        resp_ = this.getFlujoSolicitudClientes("2", difClientTemporal, request, requestCliente);
+                                        logger.info("El cliente " + difClientTemporal.getClieIdentificacion() + " realizó un diferimiento con producto mayor a 18000 mendiante gestión FVT", LOGGER_RESPONSE_FORMAT);
+                                        apiResponse = new ApiResponse("Diferimiento en proceso con gestión FVT", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.posterior"), resp_);
+                                        break;
+                                }
+                            } else {
+                                logger.warn("El cliente " + requestCliente.getIdentificacion() + " ya realizó el diferimiento como gestión posterior en HABITAR O FVT", LOGGER_RESPONSE_FORMAT);
+                                apiResponse = new ApiResponse("Cliente gestionado anteriormente ", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.proceso.final"), null);
+                            }
+                        }
+                    }
+
+                } else {
+                    logger.info("El cliente " + requestCliente.getIdentificacion() + " no se encuentra en la campaña para los diferimientos", LOGGER_REQUEST_FORMAT);
+                    //Se valida si el no cliente ya fue registrado
+                    DifLogs difLogs = iLogsDao.findByNoCliente(requestCliente.getIdentificacion());
+                    if (difLogs == null) {
+                        resp_ = this.getFlujoDiferimientoNoClientes(requestCliente, "1", request);
+                        logger.info("El cliente " + requestCliente.getIdentificacion() + " no a sido gestionado como no cliente y se guardará en la base de datos", LOGGER_RESPONSE_FORMAT);
+                        apiResponse = new ApiResponse("Diferimiento en proceso con gestión NO CLIENTES EN BASE ", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.sinBase"), resp_);
+                    } else {
+                        logger.warn("El cliente " + requestCliente.getIdentificacion() + "ya fue gestionado como no cliente en la base de datos", LOGGER_RESPONSE_FORMAT);
+                        apiResponse = new ApiResponse("Cliente gestionado anteriormente ", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.proceso.final"), null);
+                    }
+
+                }
             }
         } catch (ApiRequestException a) {
             logger.error("Uups, surgio un error al realizar un diferimiento de cuota para el usuario \t " + requestCliente.getIdentificacion(), a);
@@ -262,7 +285,28 @@ public class DiferimientoServices {
         difLogs.setLogTipo(tipo);
         this.iLogsDao.save(difLogs);
 
-        return this.createObject(null, difLogs, "C-2", "");
+        return this.createObject(null, difLogs, "C-2", "", requestCliente);
+    }
+
+
+    /**
+     * Función que guarda la transacción del cliente sobre un no diferimiento
+     *
+     * @param difCliente
+     */
+    private void getFlujoSolicitudNoAppplyClientes(DifCliente difCliente) {
+        //Se guardara la solicitud
+        try {
+            DifSolinodife difSolinodife = new DifSolinodife();
+            difSolinodife.setSondHash(difCliente.getClieHashiden());
+            difSolinodife.setClieId(difCliente);
+            difSolinodife.setSondBacaid(difCliente.getBacaId().getBacaId());
+            iSolinodifeDao.save(difSolinodife);
+            logger.info("Gestión exitosa para el cliente [" + difCliente.getClieIdentificacion() + "]", LOGGER_RESPONSE_FORMAT);
+        } catch (Exception e) {
+            logger.error("Error al guardar la solicitud en la tabla dif_solinodife");
+            logger.error(e.getMessage());
+        }
     }
 
 
@@ -273,7 +317,7 @@ public class DiferimientoServices {
      * @param difCliente
      * @param request
      */
-    private ResponseDiferimiento getFlujoSolicitudClientes(String type, DifCliente difCliente, HttpServletRequest request) {
+    private ResponseDiferimiento getFlujoSolicitudClientes(String type, DifCliente difCliente, HttpServletRequest request, RequestCliente requestCliente) {
         //Se guardara la solicitud
         try {
             //valida si se guardará en la tabla solicitud de diferimientos
@@ -290,7 +334,7 @@ public class DiferimientoServices {
             logger.error("Error al guardar la solicitud en la tabla dif_diferimiento");
             logger.error(e.getMessage());
         }
-        return this.createObject(difCliente, null, "C-1", type);
+        return this.createObject(difCliente, null, "C-1", type, requestCliente);
     }
 
 
@@ -302,7 +346,7 @@ public class DiferimientoServices {
      * @param type
      * @return
      */
-    private ResponseDiferimiento createObject(DifCliente difCliente, DifLogs difLogs, String type, String flujo) {
+    private ResponseDiferimiento createObject(DifCliente difCliente, DifLogs difLogs, String type, String flujo, RequestCliente requestCliente) {
         ResponseDiferimiento resp = null;
         switch (type) {
             case "C-1": //Cliente
@@ -312,8 +356,8 @@ public class DiferimientoServices {
                         difCliente.getClieHashiden(),
                         difCliente.getCliePrimnomb(),
                         difCliente.getCliePrimapell(),
-                        UtilResponse.enmascarar_email(difCliente.getClieEmail()),
-                        UtilResponse.enmascarar_telefono(difCliente.getClieCelular())
+                        UtilResponse.enmascarar_email(difCliente.getClieEmail() == null ? requestCliente.getEmail() : difCliente.getClieEmail()),
+                        UtilResponse.enmascarar_telefono(difCliente.getClieCelular() == null ? requestCliente.getTelefono() : difCliente.getClieCelular())
                 );
                 break;
             case "C-2": //No Clientes
@@ -322,8 +366,18 @@ public class DiferimientoServices {
                         "",
                         difLogs.getLogNombres(),
                         difLogs.getLogApellidos(),
-                        UtilResponse.enmascarar_email(difLogs.getLogEmail()),
-                        UtilResponse.enmascarar_telefono(difLogs.getLogTelefono())
+                        UtilResponse.enmascarar_email(difLogs.getLogEmail() == null ? requestCliente.getEmail() : difLogs.getLogEmail()),
+                        UtilResponse.enmascarar_telefono(difLogs.getLogTelefono() == null ? requestCliente.getTelefono() : difLogs.getLogTelefono())
+                );
+                break;
+            case "C-3"://Clientes que no aplican a un diferimiento
+                resp = new ResponseDiferimiento(
+                        "",
+                        "",
+                        difCliente.getCliePrimnomb(),
+                        "",
+                        UtilResponse.enmascarar_email(difCliente.getClieEmail() == null ? requestCliente.getEmail() : difCliente.getClieEmail()),
+                        UtilResponse.enmascarar_telefono(difCliente.getClieCelular() == null ? requestCliente.getTelefono() : difCliente.getClieCelular())
                 );
                 break;
         }

@@ -17,7 +17,10 @@ import java.util.List;
 @Repository
 public interface IClienteDao extends JpaRepository<DifCliente, Integer> {
 
-    @Query(value = "SELECT * FROM dif_cliente d WHERE d.clie_identificacion=:identificacion", nativeQuery = true)
+    @Query(value = "SELECT d.* FROM dif_cliente d INNER JOIN dif_basecampa b ON b.baca_id=d.baca_id WHERE d.clie_identificacion=:identificacion AND b.baca_shorname='CADIFNOCLI' AND b.baca_estado != 0", nativeQuery = true)
+    public abstract List<DifCliente> findByClientNoApplyDiffer(@Param("identificacion") String identificacion);
+
+    @Query(value = "SELECT d.* FROM dif_cliente d INNER JOIN dif_basecampa b ON b.baca_id=d.baca_id WHERE d.clie_identificacion=:identificacion AND b.baca_shorname='CADIF' AND b.baca_estado != 0", nativeQuery = true)
     public abstract List<DifCliente> findByCliente(@Param("identificacion") String identificacion);
 
     @Query(value = "select * from dif_cliente where clie_id !=:clieId and (clie_montcapitotal < 18000 or clie_montcapivencer < 18000 ) and clie_identificacion=:identificacion", nativeQuery = true)
@@ -29,8 +32,8 @@ public interface IClienteDao extends JpaRepository<DifCliente, Integer> {
     @Query(value = "SELECT * FROM dif_cliente d WHERE d.clie_identificacion=:identificacion AND d.baca_id=:bacaId limit 1", nativeQuery = true)
     public abstract DifCliente findByTarjetaCliente(@Param("identificacion") String identificacion, @Param("bacaId") Integer bacaId);
 
-    @Query(value = "SELECT * FROM dif_cliente d WHERE d.clie_id=:idcliente", nativeQuery = true)
-    public abstract DifCliente findByIdCliente(@Param("idcliente") String idcliente);
+    @Query(value = "SELECT * FROM dif_cliente d WHERE d.clie_id=:idcliente AND d.baca_id=:bacaId", nativeQuery = true)
+    public abstract DifCliente findByIdCliente(@Param("idcliente") Integer idcliente, @Param("bacaId") Integer bacaId);
 
     @Query(value = "SELECT * FROM dif_cliente d WHERE d.clie_hashiden=:hashiden", nativeQuery = true)
     public abstract DifCliente findByHashCliente(@Param("hashiden") String hashiden);
