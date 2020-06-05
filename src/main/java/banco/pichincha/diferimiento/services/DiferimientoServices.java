@@ -60,7 +60,16 @@ public class DiferimientoServices {
         ResponseDiferimiento resp_ = null;
         switch (requestCliente.getTipo()) {
             case "1"://CREDITO
-                apiResponse = this.procesoCredito(requestCliente, request);
+                String procesobaseDiferimientos = getPreProcessDiferimient(requestCliente);
+                if (procesobaseDiferimientos.equals("DIF")) {
+                    logger.warn("El cliente " + requestCliente.getIdentificacion() + " fue gestionado en varias campañas [diferimiento] [no diferimiento] ", LOGGER_RESPONSE_FORMAT);
+                    apiResponse = new ApiResponse("Cliente no aplica a diferimiento", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.proceso.no.aplican.diferimientos"), null);
+                } else if (procesobaseDiferimientos.equals("REP")) {
+                    logger.warn("El cliente " + requestCliente.getIdentificacion() + " ya fué gestionado por campañas anteriores [diferimiento] y [no diferimiento] ", LOGGER_RESPONSE_FORMAT);
+                    apiResponse = new ApiResponse("Cliente gestionado anteriormente", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.proceso.final"), null);
+                } else {
+                    apiResponse = this.procesoCredito(requestCliente, request);
+                }
                 //Se actualiza la información de los clientes de los datos ingresados desde el formulario
                 this.updateInfoCliente(requestCliente);
                 //apiResponse = this.flujoTemporal(requestCliente, request);
@@ -78,6 +87,24 @@ public class DiferimientoServices {
     }
 
     /**
+     * Funcion que permite validar si el cliente está en diferentes campañas tanto diferimientos como no diferimientos
+     *
+     * @param requestCliente
+     * @return
+     */
+    public String getPreProcessDiferimient(RequestCliente requestCliente) {
+        logger.info("Validando si el cliente [" + requestCliente.getIdentificacion() + "] está en ambas campañas", LOGGER_REQUEST_FORMAT);
+        String type = "";
+        try {
+            type = iClienteDao.getRowsDiferimientoandNotDiferimientos(requestCliente.getIdentificacion());
+        } catch (Exception e) {
+            logger.error("Uups, surgio un error al validar si el cliente está en varios campañas \t " + requestCliente.getIdentificacion(), e);
+            throw new ApiRequestException("No se pudo validar el procedimiento almacenado");
+        }
+        return type;
+    }
+
+    /**
      * Funcion que permite validar el proceso de creditos
      *
      * @param requestCliente
@@ -90,7 +117,7 @@ public class DiferimientoServices {
         try {
             logger.info("1.- Consultando si el cliente no aplica al diferimiento");
             List<DifCliente> lstSoliClientNoApplyDiffer = iClienteDao.findByClientNoApplyDiffer(requestCliente.getIdentificacion());
-            if (lstSoliClientNoApplyDiffer != null) {
+            if (lstSoliClientNoApplyDiffer != null && lstSoliClientNoApplyDiffer.size() > 0) {
                 logger.info("El cliente [" + requestCliente.getIdentificacion() + "] está en base de clientes que no aplican a un diferimiento y se gestionará para flujo de call center.", LOGGER_REQUEST_FORMAT);
                 DifSolinodife difSolinodife = iSolinodifeDao.findSolinoDifeByClient(lstSoliClientNoApplyDiffer.get(0).getClieId(), lstSoliClientNoApplyDiffer.get(0).getBacaId().getBacaId());
                 if (difSolinodife != null) {

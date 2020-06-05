@@ -43,11 +43,14 @@ public interface IClienteDao extends JpaRepository<DifCliente, Integer> {
     @Query(value = "UPDATE dif_cliente d set d.clie_celularform=:celularform , d.clie_emailform=:emailform  WHERE d.clie_identificacion=:identificacion", nativeQuery = true)
     public void changeValuesEmailPhoneOfClient(@Param("celularform") String celularform, @Param("emailform") String emailform, @Param("identificacion") String identificacion);
 
-    /**
+    /**  
      * PROCEDIMIENTOS ALMACENADOS
      */
-    @Procedure(name = "bp_gestion_operaciones_habitar_preciso_autoseguro", outputParameterName = "tipo")
+    @Procedure(name = "bp_gestion_diferimiento_nodiferimiento", outputParameterName = "tipo")
     public abstract String getTypeRelacionPrecisoHabitarAutoseguro(@Param("identificacion") String identificacion);
+
+    @Procedure(name = "bp_gestion_diferimiento_nodiferimiento", outputParameterName = "tipo")
+    public abstract String getRowsDiferimientoandNotDiferimientos(@Param("identificacion") String identificacion);
 
 
 }

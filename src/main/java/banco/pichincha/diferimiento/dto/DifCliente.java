@@ -13,6 +13,12 @@ import java.util.Collection;
                 procedureName = "bp_gestion_operaciones_habitar_preciso_autoseguro",
                 parameters = {@StoredProcedureParameter(name = "identificacion", type = String.class, mode = ParameterMode.IN),
                         @StoredProcedureParameter(name = "tipo", type = String.class, mode = ParameterMode.OUT)
+                }),
+        @NamedStoredProcedureQuery(
+                name = "bp_gestion_diferimiento_nodiferimiento",
+                procedureName = "bp_gestion_diferimiento_nodiferimiento",
+                parameters = {@StoredProcedureParameter(name = "identificacion", type = String.class, mode = ParameterMode.IN),
+                        @StoredProcedureParameter(name = "tipo", type = String.class, mode = ParameterMode.OUT)
                 })
 })
 @XmlRootElement
