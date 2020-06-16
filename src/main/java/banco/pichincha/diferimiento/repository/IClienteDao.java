@@ -46,7 +46,7 @@ public interface IClienteDao extends JpaRepository<DifCliente, Integer> {
     /**  
      * PROCEDIMIENTOS ALMACENADOS
      */
-    @Procedure(name = "bp_gestion_diferimiento_nodiferimiento", outputParameterName = "tipo")
+    @Procedure(name = "bp_gestion_operaciones_habitar_preciso_autoseguro", outputParameterName = "tipo")
     public abstract String getTypeRelacionPrecisoHabitarAutoseguro(@Param("identificacion") String identificacion);
 
     @Procedure(name = "bp_gestion_diferimiento_nodiferimiento", outputParameterName = "tipo")
