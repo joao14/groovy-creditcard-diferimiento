@@ -23,6 +23,9 @@ public interface IClienteDao extends JpaRepository<DifCliente, Integer> {
     @Query(value = "SELECT d.* FROM dif_cliente d INNER JOIN dif_basecampa b ON b.baca_id=d.baca_id WHERE d.clie_identificacion=:identificacion AND b.baca_shorname='CADIF' AND b.baca_estado != 0", nativeQuery = true)
     public abstract List<DifCliente> findByCliente(@Param("identificacion") String identificacion);
 
+    @Query(value = "SELECT count(*) FROM dif_cliente d INNER JOIN dif_basecampa b ON b.baca_id=d.baca_id WHERE d.clie_identificacion=:identificacion AND b.baca_shorname='CADIFGEST' AND b.baca_estado != 0", nativeQuery = true)
+    public abstract String findByClienteAlreadyApplied(@Param("identificacion") String identificacion);
+
     @Query(value = "select * from dif_cliente where clie_id !=:clieId and (clie_montcapitotal < 18000 or clie_montcapivencer < 18000 ) and clie_identificacion=:identificacion", nativeQuery = true)
     public abstract List<DifCliente> findByCreditosClienteMenor18000(@Param("identificacion") String identificacion, @Param("clieId") Integer clieId);
 

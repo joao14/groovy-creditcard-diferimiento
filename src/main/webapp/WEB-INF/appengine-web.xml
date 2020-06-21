@@ -3,9 +3,9 @@
   <application>marketingdigital</application>
   <version>1</version>
   <!--Desarrollo-->
-  <service>md-diferimiento-dev</service>
+  <!--<service>md-diferimiento-dev</service>-->
   <!--Producción -->
-  <!--<service>md-diferimiento</service>-->
+  <service>md-diferimiento</service>
   <threadsafe>true</threadsafe>
   <runtime>java8</runtime>
 </appengine-web-app>

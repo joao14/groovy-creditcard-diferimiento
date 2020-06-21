@@ -60,19 +60,25 @@ public class DiferimientoServices {
         ResponseDiferimiento resp_ = null;
         switch (requestCliente.getTipo()) {
             case "1"://CREDITO
-                String procesobaseDiferimientos = getPreProcessDiferimient(requestCliente);
-                if (procesobaseDiferimientos.equals("DIF")) {
-                    logger.warn("El cliente " + requestCliente.getIdentificacion() + " fue gestionado en varias campañas [diferimiento] [no diferimiento] ", LOGGER_RESPONSE_FORMAT);
-                    apiResponse = new ApiResponse("Cliente no aplica a diferimiento", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.proceso.no.aplican.diferimientos"), null);
-                } else if (procesobaseDiferimientos.equals("REP")) {
-                    logger.warn("El cliente " + requestCliente.getIdentificacion() + " ya fué gestionado por campañas anteriores [diferimiento] y [no diferimiento] ", LOGGER_RESPONSE_FORMAT);
+                String alreadyApplied = iClienteDao.findByClienteAlreadyApplied(requestCliente.getIdentificacion());
+                if (Integer.valueOf(alreadyApplied) > 0) {
+                    logger.warn("El cliente [" + requestCliente.getIdentificacion() + "] se encuentra en campaña de clientes que ya difirieron", LOGGER_RESPONSE_FORMAT);
                     apiResponse = new ApiResponse("Cliente gestionado anteriormente", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.proceso.final"), null);
                 } else {
-                    apiResponse = this.procesoCredito(requestCliente, request);
+                    String procesobaseDiferimientos = getPreProcessDiferimient(requestCliente);
+                    if (procesobaseDiferimientos.equals("DIF")) {
+                        logger.warn("El cliente " + requestCliente.getIdentificacion() + " fue gestionado en varias campañas [diferimiento] [no diferimiento] ", LOGGER_RESPONSE_FORMAT);
+                        apiResponse = new ApiResponse("Cliente no aplica a diferimiento", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.proceso.no.aplican.diferimientos"), null);
+                    } else if (procesobaseDiferimientos.equals("REP")) {
+                        logger.warn("El cliente " + requestCliente.getIdentificacion() + " ya fué gestionado por campañas anteriores [diferimiento] y [no diferimiento] ", LOGGER_RESPONSE_FORMAT);
+                        apiResponse = new ApiResponse("Cliente gestionado anteriormente", String.valueOf(HttpStatus.OK.value()), HttpStatus.OK, new Date(), env.getRequiredProperty("data.estado.flujo.gestion.proceso.final"), null);
+                    } else {
+                        apiResponse = this.procesoCredito(requestCliente, request);
+                    }
+                    //Se actualiza la información de los clientes de los datos ingresados desde el formulario
+                    this.updateInfoCliente(requestCliente);
+                    //apiResponse = this.flujoTemporal(requestCliente, request);
                 }
-                //Se actualiza la información de los clientes de los datos ingresados desde el formulario
-                this.updateInfoCliente(requestCliente);
-                //apiResponse = this.flujoTemporal(requestCliente, request);
                 break;
             case "2"://TARJETAS
                 apiResponse = this.procesoTarjetas(requestCliente, request);
