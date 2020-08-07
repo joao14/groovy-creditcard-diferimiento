@@ -37,13 +37,12 @@ public class EncryptService {
      * @return
      * @throws IOException
      */
-    private String decrypt(byte[] ciphertext, String tipo) {
+    private String  decrypt(byte[] ciphertext, String tipo) {
         // Create the KeyManagementServiceClient using try-with-resources to manage client cleanup.
         try (KeyManagementServiceClient client = KeyManagementServiceClient.create()) {
             AsymmetricDecryptResponse responseName =
                     client.asymmetricDecrypt(env.getRequiredProperty("gcloud.endKane"),
                             ByteString.copyFrom(Base64.getDecoder().decode(ciphertext)));
-
             return responseName.getPlaintext().toStringUtf8();
         } catch (Exception e) {
             logger.error("Error al momento de desencriptar la trama " + e.getMessage(), LOGGER_RESPONSE_FORMAT);
